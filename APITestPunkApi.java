@@ -1,33 +1,47 @@
-import io.restassured.path.json.JsonPath;
-import io.restassured.response.Response;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import pl.javastart.main.pojo.Beer;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
-import static io.restassured.RestAssured.get;
+import static io.restassured.RestAssured.given;
 
 public class APITestPunkApi {
-    
     @Test
-    public void testIfResponseContainsOnlyItemsWithABVabove6() {
-        // Define endpoint with query parameter that is subject of test
-        Response response = get("https://api.punkapi.com/v2/beers?abv_gt=6");
+    public void testIfGetBeersRequestReturnsAtLeastOneRecord() {
 
-        // Get the JsonPath object instance from the Response interface
-        JsonPath jsonPathEvaluator = response.jsonPath();
+        List<Beer> beers = given()
+                .baseUri("https://api.punkapi.com/v2")
+                .basePath("beers")
+                .when()
+                .get()
+                .then()
+                .statusCode(200)
+                .extract()
+                .body()
+                // here's the magic
+                .jsonPath().getList(".", Beer.class);
+        Assert.assertTrue(beers.size() > 0, "API replied with empty list.");
 
-        // Slice the whole response to contain only ABV attribute of each item
-        // Use List of Numbers since we may approach different formats of data (floats, integers)
-        List<Number> allItemsABV = jsonPathEvaluator.getList("abv");
+    }
+    @Test
+    public void testIfRequestWithAbvGreaterThanSixReturnsRecordsWithAbvGreaterThanSix() {
 
-        // Iterate through list and make assertions
-        for (int i = 0; i < allItemsABV.size(); i++) {
-            System.out.println(allItemsABV.get(i));
-            System.out.println(allItemsABV.get(i).getClass().getName());
-            System.out.println(allItemsABV.get(i).floatValue() > 6.0);
-            Assert.assertTrue(allItemsABV.get(i).floatValue() > 6.0);
-        }
+        List<Beer> beers = given()
+                .baseUri("https://api.punkapi.com/v2")
+                .basePath("beers")
+                .queryParam("abv_gt", "6")
+                .when()
+                .get()
+                .then()
+                .statusCode(200)
+                .extract()
+                .body()
+                // here's the magic
+                .jsonPath().getList(".", Beer.class);
+        List<Beer> filteredBeers = beers.stream().filter(beer -> beer.getAbv() < 6.0).collect(Collectors.toList());
+        Assert.assertTrue(filteredBeers.size() == 0, "The reponse contains items with ABV greater than 6.");
 
     }
 }
